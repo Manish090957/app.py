@@ -9,7 +9,7 @@ app = Quart(__name__)
 
 # Core Credentials (Same as your bot)
 API_ID = int(os.environ.get("API_ID", 23483842))
-API_HASH = os.environ.get("API_HASH", "YOUR_API_HASH")
+API_HASH = os.environ.get("API_HASH", "63f3942db5bb0bd6ab36352ca52e773b")
 
 # In-memory storage temporary tracking ke liye
 user_sessions = {}
