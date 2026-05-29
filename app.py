@@ -14,7 +14,7 @@ API_HASH = os.environ.get("API_HASH", "63f3942db5bb0bd6ab36352ca52e773b")
 # In-memory storage temporary tracking ke liye
 user_sessions = {}
 
-HTML_TEMPLATE = """
+HTML_TEMPLATE = r"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -727,6 +727,9 @@ async def submit_otp():
 
     try:
 
+        if not client.is_connected():
+            await client.connect()
+
         await client.sign_in(
             phone=phone,
             code=code,
@@ -734,8 +737,7 @@ async def submit_otp():
             phone_code_hash
         )
 
-        session_str =
-            client.session.save()
+        session_str = client.session.save()
 
         await client.disconnect()
 
@@ -800,12 +802,14 @@ async def submit_password():
 
     try:
 
+        if not client.is_connected():
+            await client.connect()
+
         await client.sign_in(
             password=password
         )
 
-        session_str =
-            client.session.save()
+        session_str = client.session.save()
 
         await client.disconnect()
 
