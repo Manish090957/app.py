@@ -18,124 +18,466 @@ HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Telethon Session Generator</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px; box-sizing: border-box; }
-        h2 { margin-top: 0; color: #333; text-align: center; }
-        p { color: #666; font-size: 14px; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 12px; background: #2481cc; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: background 0.3s; }
-        button:hover { background: #1a65a3; }
-        .hidden { display: none; }
-        .success-box { background: #e6f4ea; border: 1px solid #137333; padding: 15px; border-radius: 6px; word-break: break-all; font-family: monospace; font-size: 12px; margin-top: 15px; }
-        .error { color: red; font-size: 14px; text-align: center; margin-top: 10px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Secure Telethon Session Generator</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+    background:#f4f7f6;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:100vh;
+    padding:20px;
+}
+
+.card{
+    background:#fff;
+    width:100%;
+    max-width:420px;
+    border-radius:20px;
+    padding:30px;
+    box-shadow:0 10px 35px rgba(0,0,0,.12);
+}
+
+h2{
+    text-align:center;
+    margin-bottom:10px;
+    color:#222;
+}
+
+p{
+    text-align:center;
+    color:#666;
+    font-size:14px;
+    line-height:1.6;
+}
+
+input{
+    width:100%;
+    padding:14px;
+    border:1px solid #ddd;
+    border-radius:10px;
+    margin-top:14px;
+    outline:none;
+    font-size:15px;
+    transition:.3s;
+}
+
+input:focus{
+    border-color:#2481cc;
+}
+
+button{
+    width:100%;
+    margin-top:14px;
+    border:none;
+    border-radius:10px;
+    padding:14px;
+    background:#2481cc;
+    color:#fff;
+    cursor:pointer;
+    font-size:16px;
+    font-weight:600;
+    transition:.3s;
+}
+
+button:hover{
+    background:#1a65a3;
+}
+
+button:disabled{
+    opacity:.7;
+    cursor:not-allowed;
+}
+
+.copy-btn{
+    background:#16a34a;
+}
+
+.copy-btn:hover{
+    background:#15803d;
+}
+
+.hidden{
+    display:none;
+}
+
+.success-box{
+    background:#eefbf2;
+    border:2px solid #16a34a;
+    border-radius:12px;
+    padding:15px;
+    margin-top:15px;
+    font-family:monospace;
+    font-size:12px;
+    word-break:break-all;
+    max-height:200px;
+    overflow:auto;
+}
+
+.error{
+    text-align:center;
+    margin-top:15px;
+    color:red;
+    font-size:14px;
+}
+
+.success-title{
+    color:#16a34a;
+    text-align:center;
+    font-weight:700;
+    margin-top:15px;
+}
+
+.small{
+    font-size:12px;
+    color:#999;
+    margin-top:10px;
+}
+
+.loader{
+    display:none;
+    text-align:center;
+    margin-top:12px;
+    color:#2481cc;
+    font-size:14px;
+}
+</style>
 </head>
+
 <body>
-    <div class="card">
-        <h2>String Session Generator</h2>
-        <p id="status-text">Enter your phone number with country code to request login.</p>
-        
-        <div id="step-phone">
-            <input type="text" id="phone" placeholder="+919876543210">
-            <button onclick="sendPhone()">Send Code</button>
-        </div>
 
-        <div id="step-otp" class="hidden">
-            <input type="text" id="otp" placeholder="Enter 5-digit OTP">
-            <button onclick="sendOtp()">Verify OTP</button>
-        </div>
+<div class="card">
 
-        <div id="step-2fa" class="hidden">
-            <input type="password" id="password" placeholder="Enter 2FA Password">
-            <button onclick="sendPassword()">Submit Password</button>
-        </div>
+    <h2>String Session Generator</h2>
 
-        <div id="step-success" class="hidden">
-            <p style="color: green; font-weight: bold;">🎉 Session Generated Successfully!</p>
-            <div class="success-box" id="token-box"></div>
-            <p style="font-size: 12px; margin-top: 10px; color: #999;">Copy this complete string and paste it into the bot panel.</p>
-        </div>
+    <p id="status-text">
+        Enter your phone number with country code.
+    </p>
 
-        <div id="error-msg" class="error"></div>
+    <div id="step-phone">
+        <input
+            type="text"
+            id="phone"
+            placeholder="+919876543210"
+        >
+
+        <button id="phoneBtn" onclick="sendPhone()">
+            Send Code
+        </button>
     </div>
 
-    <script>
-        let currentPhone = "";
+    <div id="step-otp" class="hidden">
+        <input
+            type="text"
+            id="otp"
+            placeholder="Enter OTP"
+        >
 
-        async function safeAPI(url, data) {
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            return await res.json();
+        <button id="otpBtn" onclick="sendOtp()">
+            Verify OTP
+        </button>
+    </div>
+
+    <div id="step-2fa" class="hidden">
+        <input
+            type="password"
+            id="password"
+            placeholder="Enter 2FA Password"
+        >
+
+        <button id="passBtn" onclick="sendPassword()">
+            Submit Password
+        </button>
+    </div>
+
+    <div id="step-success" class="hidden">
+
+        <p class="success-title">
+            Session Generated Successfully
+        </p>
+
+        <div
+            class="success-box"
+            id="token-box">
+        </div>
+
+        <button
+            class="copy-btn"
+            onclick="copySession()">
+            Copy Session
+        </button>
+
+        <p class="small">
+            Keep this session secure.
+        </p>
+    </div>
+
+    <div class="loader" id="loader">
+        Processing...
+    </div>
+
+    <div class="error" id="error-msg"></div>
+
+</div>
+
+<script>
+
+let currentPhone = "";
+
+function setLoading(status){
+    document.getElementById("loader").style.display =
+        status ? "block" : "none";
+}
+
+async function safeAPI(url,data){
+
+    const res = await fetch(url,{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify(data)
+    });
+
+    return await res.json();
+}
+
+async function sendPhone(){
+
+    const phone =
+        document.getElementById("phone")
+        .value.trim();
+
+    if(!phone) return;
+
+    currentPhone = phone;
+
+    document.getElementById(
+        "error-msg"
+    ).innerText = "";
+
+    setLoading(true);
+
+    try{
+
+        const res =
+            await safeAPI(
+                "/submit_phone",
+                {phone}
+            );
+
+        if(res.status==="ok"){
+
+            document
+                .getElementById("step-phone")
+                .classList.add("hidden");
+
+            document
+                .getElementById("step-otp")
+                .classList.remove("hidden");
+
+            document
+                .getElementById("status-text")
+                .innerText =
+                "Check Telegram for OTP code.";
+
+        }else{
+
+            document
+                .getElementById("error-msg")
+                .innerText =
+                res.message;
         }
 
-        async function sendPhone() {
-            const phone = document.getElementById('phone').value.trim();
-            if(!phone) return;
-            currentPhone = phone;
-            document.getElementById('error-msg').innerText = "";
-            
-            const res = await safeAPI('/submit_phone', { phone });
-            if(res.status === 'ok') {
-                document.getElementById('step-phone').classList.add('hidden');
-                document.getElementById('step-otp').classList.remove('hidden');
-                document.getElementById('status-text').innerText = "Check your official Telegram app for the code.";
-            } else {
-                document.getElementById('error-msg').innerText = res.message;
-            }
+    }catch(err){
+
+        document
+            .getElementById("error-msg")
+            .innerText =
+            "Network error.";
+
+    }
+
+    setLoading(false);
+}
+
+async function sendOtp(){
+
+    const otp =
+        document.getElementById("otp")
+        .value.trim();
+
+    if(!otp) return;
+
+    document.getElementById(
+        "error-msg"
+    ).innerText = "";
+
+    setLoading(true);
+
+    try{
+
+        const res =
+            await safeAPI(
+                "/submit_otp",
+                {
+                    phone:currentPhone,
+                    code:otp
+                }
+            );
+
+        if(res.status==="ok"){
+
+            showSuccess(
+                res.session
+            );
+
+        }else if(
+            res.status==="2fa_needed"
+        ){
+
+            document
+                .getElementById("step-otp")
+                .classList.add("hidden");
+
+            document
+                .getElementById("step-2fa")
+                .classList.remove("hidden");
+
+            document
+                .getElementById("status-text")
+                .innerText =
+                "2FA password required.";
+
+        }else{
+
+            document
+                .getElementById("error-msg")
+                .innerText =
+                res.message;
         }
 
-        async function sendOtp() {
-            const otp = document.getElementById('otp').value.trim();
-            if(!otp) return;
-            document.getElementById('error-msg').innerText = "";
+    }catch(err){
 
-            const res = await safeAPI('/submit_otp', { phone: currentPhone, code: otp });
-            if(res.status === 'ok') {
-                showSuccess(res.session);
-            } else if(res.status === '2fa_needed') {
-                document.getElementById('step-otp').classList.add('hidden');
-                document.getElementById('step-2fa').classList.remove('hidden');
-                document.getElementById('status-text').innerText = "Two-Step Verification (2FA) is enabled on your account.";
-            } else {
-                document.getElementById('error-msg').innerText = res.message;
-            }
+        document
+            .getElementById("error-msg")
+            .innerText =
+            "Network error.";
+    }
+
+    setLoading(false);
+}
+
+async function sendPassword(){
+
+    const password =
+        document
+        .getElementById("password")
+        .value.trim();
+
+    if(!password) return;
+
+    document.getElementById(
+        "error-msg"
+    ).innerText = "";
+
+    setLoading(true);
+
+    try{
+
+        const res =
+            await safeAPI(
+                "/submit_password",
+                {
+                    phone:currentPhone,
+                    password
+                }
+            );
+
+        if(res.status==="ok"){
+
+            showSuccess(
+                res.session
+            );
+
+        }else{
+
+            document
+                .getElementById("error-msg")
+                .innerText =
+                res.message;
         }
 
-        async function sendPassword() {
-            const password = document.getElementById('password').value.trim();
-            if(!password) return;
-            document.getElementById('error-msg').innerText = "";
+    }catch(err){
 
-            const res = await safeAPI('/submit_password', { phone: currentPhone, password });
-            if(res.status === 'ok') {
-                showSuccess(res.session);
-            } else {
-                document.getElementById('error-msg').innerText = res.message;
-            }
-        }
+        document
+            .getElementById("error-msg")
+            .innerText =
+            "Network error.";
+    }
 
-        function showSuccess(sessionStr) {
-            document.getElementById('step-otp').classList.add('hidden');
-            document.getElementById('step-2fa').classList.add('hidden');
-            document.getElementById('step-success').classList.remove('hidden');
-            document.getElementById('status-text').innerText = "Keep this session string secure.";
-            document.getElementById('token-box').innerText = sessionStr;
-        }
-    </script>
+    setLoading(false);
+}
+
+function showSuccess(sessionStr){
+
+    document
+        .getElementById("step-otp")
+        .classList.add("hidden");
+
+    document
+        .getElementById("step-2fa")
+        .classList.add("hidden");
+
+    document
+        .getElementById("step-success")
+        .classList.remove("hidden");
+
+    document
+        .getElementById("status-text")
+        .innerText =
+        "Your StringSession is ready.";
+
+    document
+        .getElementById("token-box")
+        .innerText =
+        sessionStr;
+}
+
+async function copySession(){
+
+    const text =
+        document
+        .getElementById("token-box")
+        .innerText;
+
+    await navigator
+        .clipboard
+        .writeText(text);
+
+    alert("Session copied!");
+}
+
+</script>
+
 </body>
 </html>
 """
 
 @app.route('/')
 async def index():
-    # ✅ FIXED: Added await here
+    # âœ… FIXED: Added await here
     return await render_template_string(HTML_TEMPLATE)
 
 @app.route('/submit_phone', methods=['POST'])
