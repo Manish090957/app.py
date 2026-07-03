@@ -6,336 +6,376 @@ from telethon.errors import SessionPasswordNeededError
 
 app = Quart(__name__)
 
-# Default Credentials (fallback)
-DEFAULT_API_ID = int(os.environ.get("API_ID", 23483842))
-DEFAULT_API_HASH = os.environ.get("API_HASH", "63f3942db5bb0bd6ab36352ca52e773b")
+# Core Credentials
+API_ID = int(os.environ.get("API_ID", 23483842))
+API_HASH = os.environ.get("API_HASH", "63f3942db5bb0bd6ab36352ca52e773b")
 
 # In-memory storage for temporary tracking
 user_sessions = {}
 
-HTML_TEMPLATE = r"""
-<!DOCTYPE html>
+HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Telegram String Session Generator</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Segoe UI', Tahoma, sans-serif;
-    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    color: #e6edf3;
-  }
-  .card {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 14px;
-    padding: 28px;
-    width: 100%;
-    max-width: 440px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-  }
-  h1 {
-    font-size: 22px;
-    margin-bottom: 6px;
-    text-align: center;
-    color: #58a6ff;
-  }
-  .subtitle {
-    text-align: center;
-    font-size: 13px;
-    color: #8b949e;
-    margin-bottom: 18px;
-  }
-  .disclaimer {
-    background: #2d1b1b;
-    border: 1px solid #6e2828;
-    color: #ffb4b4;
-    font-size: 12px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    margin-bottom: 18px;
-    line-height: 1.5;
-  }
-  .disclaimer b { color: #ff6b6b; }
-  label {
-    display: block;
-    font-size: 13px;
-    margin-bottom: 6px;
-    color: #c9d1d9;
-    font-weight: 500;
-  }
-  input {
-    width: 100%;
-    padding: 11px 12px;
-    border: 1px solid #30363d;
-    background: #0d1117;
-    color: #e6edf3;
-    border-radius: 8px;
-    font-size: 14px;
-    margin-bottom: 14px;
-    outline: none;
-    transition: border 0.2s;
-  }
-  input:focus { border-color: #58a6ff; }
-  button {
-    width: 100%;
-    padding: 12px;
-    border: none;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #238636, #2ea043);
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
-  button:hover { opacity: 0.9; }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .otp-boxes {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  .otp-boxes input {
-    width: 100%;
-    text-align: center;
-    font-size: 20px;
-    font-weight: 600;
-    padding: 12px 0;
-    margin: 0;
-  }
-  .session-box {
-    background: #0d1117;
-    border: 1px solid #30363d;
-    padding: 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    word-break: break-all;
-    color: #7ee787;
-    margin-bottom: 14px;
-    max-height: 160px;
-    overflow-y: auto;
-    font-family: 'Courier New', monospace;
-  }
-  .success-title {
-    color: #7ee787;
-    font-size: 16px;
-    text-align: center;
-    margin-bottom: 14px;
-    font-weight: 600;
-  }
-  .warn {
-    text-align: center;
-    color: #f0883e;
-    font-size: 12px;
-    margin-top: 12px;
-  }
-  .loader {
-    text-align: center;
-    color: #58a6ff;
-    font-size: 14px;
-    padding: 10px;
-  }
-  .error {
-    color: #ff6b6b;
-    font-size: 13px;
-    margin-bottom: 10px;
-    text-align: center;
-  }
-  .hidden { display: none; }
-  .row { display: flex; gap: 10px; }
-  .row > div { flex: 1; }
-  footer {
-    text-align: center;
-    font-size: 11px;
-    color: #6e7681;
-    margin-top: 16px;
-  }
-</style>
-</head>
-<body>
-  <div class="card">
-    <h1>🔐 String Session Generator</h1>
-    <p class="subtitle">Telethon • Secure • Fast</p>
-
-    <div class="disclaimer">
-      <b>⚠ Disclaimer:</b> Never share your string session with anyone.
-      Whoever holds it can fully access your Telegram account.
-      Use this tool at your own risk.
-    </div>
-
-    <!-- STEP 1: Phone + Credentials -->
-    <div id="step1">
-      <div class="row">
-        <div>
-          <label>API ID</label>
-          <input type="text" id="apiId" placeholder="Your API ID" />
-        </div>
-        <div>
-          <label>API Hash</label>
-          <input type="text" id="apiHash" placeholder="Your API Hash" />
-        </div>
-      </div>
-      <label>Phone Number</label>
-      <input type="text" id="phone" placeholder="+91XXXXXXXXXX" />
-      <div class="error hidden" id="err1"></div>
-      <button onclick="sendCode()">Send Code</button>
-    </div>
-
-    <!-- STEP 2: OTP -->
-    <div id="step2" class="hidden">
-      <label>Enter OTP sent to your Telegram</label>
-      <div class="otp-boxes">
-        <input maxlength="1" class="otp" />
-        <input maxlength="1" class="otp" />
-        <input maxlength="1" class="otp" />
-        <input maxlength="1" class="otp" />
-        <input maxlength="1" class="otp" />
-      </div>
-      <div class="error hidden" id="err2"></div>
-      <button onclick="verifyOtp()">Verify OTP</button>
-    </div>
-
-    <!-- STEP 3: 2FA -->
-    <div id="step3" class="hidden">
-      <label>Two-Factor Password</label>
-      <input type="password" id="password" placeholder="Your 2FA password" />
-      <div class="error hidden" id="err3"></div>
-      <button onclick="submitPwd()">Submit Password</button>
-    </div>
-
-    <!-- STEP 4: Done -->
-    <div id="step4" class="hidden">
-      <div class="success-title">✅ Session Generated Successfully</div>
-      <div class="session-box" id="sessionOut"></div>
-      <button onclick="copySession()">📋 Copy Session</button>
-      <div class="warn">⚠ Keep this session private and secure.</div>
-    </div>
-
-    <!-- Loader -->
-    <div id="loader" class="loader hidden">⏳ Processing...</div>
-
-    <footer>Built with Telethon • v1.0</footer>
-  </div>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StringGen · Secure Telegram Session</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
 <script>
-  const otpInputs = document.querySelectorAll('.otp');
-  otpInputs.forEach((inp, i) => {
-    inp.addEventListener('input', () => {
-      if (inp.value && i < otpInputs.length - 1) otpInputs[i + 1].focus();
-    });
-    inp.addEventListener('keydown', (e) => {
-      if (e.key === 'Backspace' && !inp.value && i > 0) otpInputs[i - 1].focus();
-    });
-  });
-
-  function showStep(n) {
-    ['step1','step2','step3','step4'].forEach(s => document.getElementById(s).classList.add('hidden'));
-    document.getElementById('step' + n).classList.remove('hidden');
-  }
-  function showLoader(v) {
-    document.getElementById('loader').classList.toggle('hidden', !v);
-  }
-  function showErr(id, msg) {
-    const el = document.getElementById(id);
-    el.textContent = msg;
-    el.classList.remove('hidden');
-  }
-  function clearErr(id) {
-    document.getElementById(id).classList.add('hidden');
-  }
-
-  async function sendCode() {
-    clearErr('err1');
-    const phone = document.getElementById('phone').value.trim();
-    const apiId = document.getElementById('apiId').value.trim();
-    const apiHash = document.getElementById('apiHash').value.trim();
-    if (!phone) return showErr('err1', 'Please enter phone number');
-    showLoader(true);
-    const res = await fetch('/submit_phone', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ phone, api_id: apiId, api_hash: apiHash })
-    });
-    const data = await res.json();
-    showLoader(false);
-    if (data.status === 'ok') showStep(2);
-    else showErr('err1', data.message || 'Error');
-  }
-
-  async function verifyOtp() {
-    clearErr('err2');
-    const phone = document.getElementById('phone').value.trim();
-    const code = Array.from(otpInputs).map(i => i.value).join('');
-    if (code.length < 5) return showErr('err2', 'Enter full OTP');
-    showLoader(true);
-    const res = await fetch('/submit_otp', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ phone, code })
-    });
-    const data = await res.json();
-    showLoader(false);
-    if (data.status === 'ok') {
-      document.getElementById('sessionOut').textContent = data.session;
-      showStep(4);
-    } else if (data.status === '2fa_needed') {
-      showStep(3);
-    } else {
-      showErr('err2', data.message || 'Invalid OTP');
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          'tg-blue': '#0088cc',
+          'tg-dark': '#0f172a',
+          'tg-surface': '#1e293b',
+        },
+        fontFamily: {
+          sans: ['Inter', 'sans-serif'],
+          mono: ['JetBrains Mono', 'monospace'],
+        }
+      }
     }
-  }
-
-  async function submitPwd() {
-    clearErr('err3');
-    const phone = document.getElementById('phone').value.trim();
-    const password = document.getElementById('password').value;
-    if (!password) return showErr('err3', 'Enter password');
-    showLoader(true);
-    const res = await fetch('/submit_password', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ phone, password })
-    });
-    const data = await res.json();
-    showLoader(false);
-    if (data.status === 'ok') {
-      document.getElementById('sessionOut').textContent = data.session;
-      showStep(4);
-    } else {
-      showErr('err3', data.message || 'Wrong password');
-    }
-  }
-
-  function copySession() {
-    const text = document.getElementById('sessionOut').textContent;
-    navigator.clipboard.writeText(text).then(() => {
-      alert('✅ Session copied to clipboard!');
-    });
   }
 </script>
+<style>
+  html, body { background: #0f172a; }
+  .hidden { display: none !important; }
+  .otp-box::-webkit-outer-spin-button,
+  .otp-box::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .spinner {
+    width: 18px; height: 18px; border-radius: 9999px;
+    border: 2px solid rgba(255,255,255,0.15);
+    border-top-color: #0088cc;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="font-sans text-slate-200 min-h-screen">
+
+<div class="min-h-screen w-full flex justify-center p-5">
+  <div class="w-full max-w-[420px] flex flex-col relative overflow-hidden">
+
+    <!-- Background glow -->
+    <div class="pointer-events-none absolute -top-24 -left-24 w-72 h-72 bg-tg-blue/20 blur-[100px] rounded-full"></div>
+
+    <!-- Header -->
+    <header class="relative z-10 mb-8 pt-2">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="size-10 bg-tg-blue rounded-xl flex items-center justify-center shadow-lg shadow-tg-blue/25">
+          <span class="text-white font-bold text-xl">S</span>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold leading-tight text-white">StringGen</h1>
+          <p class="text-xs text-slate-400">Secure Telegram Session</p>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="flex gap-1.5" id="progress-bar">
+        <div class="h-1 flex-1 bg-tg-blue rounded-full" data-step="1"></div>
+        <div class="h-1 flex-1 bg-slate-700 rounded-full" data-step="2"></div>
+        <div class="h-1 flex-1 bg-slate-700 rounded-full" data-step="3"></div>
+        <div class="h-1 flex-1 bg-slate-700 rounded-full" data-step="4"></div>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="relative z-10 flex-1 flex flex-col">
+
+      <div class="mb-6">
+        <h2 class="text-xl font-semibold text-white mb-2" id="step-title">Connect Account</h2>
+        <p class="text-sm text-slate-400" id="status-text">
+          Enter your phone number with country code.
+        </p>
+      </div>
+
+      <!-- Step 1: Phone -->
+      <div id="step-phone" class="space-y-4">
+        <div class="bg-tg-surface border border-slate-700 rounded-xl p-3 focus-within:border-tg-blue transition-colors">
+          <span class="text-xs text-slate-500 block mb-0.5">Phone Number</span>
+          <input
+            type="tel"
+            id="phone"
+            placeholder="+919876543210"
+            class="bg-transparent w-full focus:outline-none font-medium placeholder:text-slate-600 text-white"
+          >
+        </div>
+
+        <button
+          id="phoneBtn"
+          onclick="sendPhone()"
+          class="w-full bg-tg-blue hover:bg-tg-blue/90 text-white font-semibold py-4 rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-tg-blue/25 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          Send Code
+        </button>
+      </div>
+
+      <!-- Step 2: OTP -->
+      <div id="step-otp" class="hidden space-y-4">
+        <div class="flex justify-between gap-2">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-box size-[52px] rounded-xl bg-tg-surface border border-slate-700 text-center font-mono text-xl text-white focus:outline-none focus:border-tg-blue focus:ring-2 focus:ring-tg-blue/40 transition-all">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-box size-[52px] rounded-xl bg-tg-surface border border-slate-700 text-center font-mono text-xl text-white focus:outline-none focus:border-tg-blue focus:ring-2 focus:ring-tg-blue/40 transition-all">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-box size-[52px] rounded-xl bg-tg-surface border border-slate-700 text-center font-mono text-xl text-white focus:outline-none focus:border-tg-blue focus:ring-2 focus:ring-tg-blue/40 transition-all">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-box size-[52px] rounded-xl bg-tg-surface border border-slate-700 text-center font-mono text-xl text-white focus:outline-none focus:border-tg-blue focus:ring-2 focus:ring-tg-blue/40 transition-all">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-box size-[52px] rounded-xl bg-tg-surface border border-slate-700 text-center font-mono text-xl text-white focus:outline-none focus:border-tg-blue focus:ring-2 focus:ring-tg-blue/40 transition-all">
+        </div>
+
+        <button
+          id="otpBtn"
+          onclick="sendOtp()"
+          class="w-full bg-tg-blue hover:bg-tg-blue/90 text-white font-semibold py-4 rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-tg-blue/25 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          Verify OTP
+        </button>
+      </div>
+
+      <!-- Step 3: 2FA -->
+      <div id="step-2fa" class="hidden space-y-4">
+        <div class="bg-tg-surface border border-slate-700 rounded-xl p-3 focus-within:border-tg-blue transition-colors">
+          <span class="text-xs text-slate-500 block mb-0.5">2FA Password</span>
+          <input
+            type="password"
+            id="password"
+            placeholder="Enter your 2FA password"
+            class="bg-transparent w-full focus:outline-none font-medium placeholder:text-slate-600 text-white"
+          >
+        </div>
+
+        <button
+          id="passBtn"
+          onclick="sendPassword()"
+          class="w-full bg-tg-blue hover:bg-tg-blue/90 text-white font-semibold py-4 rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-tg-blue/25 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          Submit Password
+        </button>
+      </div>
+
+      <!-- Step 4: Success -->
+      <div id="step-success" class="hidden">
+        <div class="bg-tg-surface border border-slate-700 rounded-2xl p-5">
+          <div class="size-14 bg-emerald-500/15 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg class="size-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+          <h3 class="text-center text-lg font-bold text-white mb-1">Session Generated</h3>
+          <p class="text-center text-xs text-slate-400 mb-4">Your string session is ready. Keep it private.</p>
+
+          <div
+            id="token-box"
+            class="bg-tg-dark rounded-lg p-3 font-mono text-[11px] leading-relaxed break-all border border-slate-800 text-slate-300 max-h-40 overflow-y-auto mb-3"
+          ></div>
+
+          <button
+            class="w-full bg-slate-100 hover:bg-white text-tg-dark font-bold py-3 rounded-xl transition-all active:scale-[0.98]"
+            onclick="copySession()"
+          >
+            Copy Session
+          </button>
+
+          <div class="mt-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+            <p class="text-[11px] text-rose-300 leading-snug">
+              <span class="font-bold uppercase">Warning:</span>
+              This string grants full account access. Never share it.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loader -->
+      <div id="loader" class="hidden mt-4 flex items-center justify-center gap-2 text-tg-blue text-sm">
+        <span class="spinner"></span>
+        <span>Processing...</span>
+      </div>
+
+      <!-- Error -->
+      <div id="error-msg" class="hidden mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg items-start gap-3">
+        <div class="size-2 rounded-full bg-red-500 mt-1.5 shrink-0"></div>
+        <p class="text-xs text-red-300 leading-snug flex-1"></p>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="relative z-10 mt-10 pt-6 text-center">
+      <p class="text-[10px] text-slate-500 uppercase tracking-widest">
+        End-to-end encrypted · No data stored
+      </p>
+    </footer>
+
+  </div>
+</div>
+
+<script>
+let currentPhone = "";
+
+function showError(msg) {
+  const box = document.getElementById("error-msg");
+  box.querySelector("p").innerText = msg;
+  box.classList.remove("hidden");
+  box.classList.add("flex");
+}
+
+function clearError() {
+  const box = document.getElementById("error-msg");
+  box.classList.add("hidden");
+  box.classList.remove("flex");
+}
+
+function setLoading(status) {
+  const loader = document.getElementById("loader");
+  if (status) { loader.classList.remove("hidden"); loader.classList.add("flex"); }
+  else { loader.classList.add("hidden"); loader.classList.remove("flex"); }
+}
+
+function setProgress(step) {
+  document.querySelectorAll("#progress-bar div").forEach((el, i) => {
+    el.className = "h-1 flex-1 rounded-full " + (i < step ? "bg-tg-blue" : "bg-slate-700");
+  });
+}
+
+function setStep(title, status) {
+  document.getElementById("step-title").innerText = title;
+  document.getElementById("status-text").innerText = status;
+}
+
+async function safeAPI(url, data) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+  return await res.json();
+}
+
+async function sendPhone() {
+  const phone = document.getElementById("phone").value.trim();
+  if (!phone) return;
+  currentPhone = phone;
+  clearError();
+  setLoading(true);
+  try {
+    const res = await safeAPI("/submit_phone", { phone });
+    if (res.status === "ok") {
+      document.getElementById("step-phone").classList.add("hidden");
+      document.getElementById("step-otp").classList.remove("hidden");
+      setStep("Verification", "Check Telegram for the 5-digit code.");
+      setProgress(2);
+      const first = document.querySelector(".otp-box");
+      if (first) first.focus();
+    } else {
+      showError(res.message || "Something went wrong.");
+    }
+  } catch (err) {
+    showError("Network error.");
+  }
+  setLoading(false);
+}
+
+async function sendOtp() {
+  const inputs = document.querySelectorAll(".otp-box");
+  const otp = Array.from(inputs).map(i => i.value.trim()).join("");
+  if (otp.length !== 5) { showError("Enter complete OTP."); return; }
+  clearError();
+  setLoading(true);
+  try {
+    const res = await safeAPI("/submit_otp", { phone: currentPhone, code: otp });
+    if (res.status === "ok") {
+      showSuccess(res.session);
+    } else if (res.status === "2fa_needed") {
+      document.getElementById("step-otp").classList.add("hidden");
+      document.getElementById("step-2fa").classList.remove("hidden");
+      setStep("Two-Factor Auth", "Enter your Telegram 2FA password.");
+      setProgress(3);
+    } else {
+      showError(res.message || "Invalid OTP.");
+    }
+  } catch (err) {
+    showError("Network error.");
+  }
+  setLoading(false);
+}
+
+async function sendPassword() {
+  const password = document.getElementById("password").value.trim();
+  if (!password) return;
+  clearError();
+  setLoading(true);
+  try {
+    const res = await safeAPI("/submit_password", { phone: currentPhone, password });
+    if (res.status === "ok") showSuccess(res.session);
+    else showError(res.message || "Wrong password.");
+  } catch (err) {
+    showError("Network error.");
+  }
+  setLoading(false);
+}
+
+function showSuccess(sessionStr) {
+  document.getElementById("step-phone").classList.add("hidden");
+  document.getElementById("step-otp").classList.add("hidden");
+  document.getElementById("step-2fa").classList.add("hidden");
+  document.getElementById("step-success").classList.remove("hidden");
+  setStep("All Set", "Your StringSession is ready below.");
+  setProgress(4);
+  document.getElementById("token-box").innerText = sessionStr;
+}
+
+async function copySession() {
+  const text = document.getElementById("token-box").innerText.trim();
+  if (!text) { alert("No session found!"); return; }
+  try {
+    await navigator.clipboard.writeText(text);
+    alert("Session copied!");
+  } catch {
+    try {
+      const t = document.createElement("textarea");
+      t.value = text; document.body.appendChild(t);
+      t.select(); document.execCommand("copy");
+      document.body.removeChild(t);
+      alert("Session copied!");
+    } catch {
+      alert("Copy failed. Copy manually.");
+    }
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const inputs = document.querySelectorAll(".otp-box");
+  inputs.forEach((input, index) => {
+    input.addEventListener("input", (e) => {
+      let value = e.target.value.replace(/\D/g, '');
+      if (value.length > 1) {
+        inputs.forEach(i => i.value = "");
+        value.slice(0, 5).split("").forEach((c, i) => { if (inputs[i]) inputs[i].value = c; });
+        const next = Math.min(value.length, inputs.length) - 1;
+        if (next >= 0) inputs[next].focus();
+        return;
+      }
+      e.target.value = value;
+      if (value && index < inputs.length - 1) inputs[index + 1].focus();
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Backspace" && !input.value && index > 0) inputs[index - 1].focus();
+    });
+    input.addEventListener("paste", (e) => {
+      e.preventDefault();
+      const pasted = (e.clipboardData.getData("text") || "").replace(/\D/g, '').slice(0, 5);
+      inputs.forEach(i => i.value = "");
+      pasted.split("").forEach((c, i) => { if (inputs[i]) inputs[i].value = c; });
+      const last = Math.min(pasted.length, inputs.length) - 1;
+      if (last >= 0) inputs[last].focus();
+    });
+  });
+});
+</script>
+
 </body>
 </html>
 """
-
-
-def get_creds(data):
-    """Extract api_id/api_hash from payload with fallback to defaults."""
-    try:
-        api_id = int(str(data.get("api_id", "")).strip() or DEFAULT_API_ID)
-    except ValueError:
-        api_id = DEFAULT_API_ID
-    api_hash = str(data.get("api_hash", "")).strip() or DEFAULT_API_HASH
-    return api_id, api_hash
-
 
 @app.route('/')
 async def index():
@@ -350,29 +390,21 @@ async def submit_phone():
     if not phone:
         return jsonify({"status": "error", "message": "Phone number missing."})
 
-    api_id, api_hash = get_creds(data)
     client = None
-
     try:
         client = TelegramClient(
-            StringSession(),
-            api_id,
-            api_hash,
+            StringSession(), API_ID, API_HASH,
             device_model="Telegram Web",
             system_version="Windows Web",
-            app_version="1.0.0"
+            app_version="1.0.0",
         )
         await client.connect()
         send_code = await client.send_code_request(phone)
-
         user_sessions[phone] = {
             "client": client,
             "phone_code_hash": send_code.phone_code_hash,
-            "api_id": api_id,
-            "api_hash": api_hash,
         }
         return jsonify({"status": "ok"})
-
     except Exception as e:
         if client:
             await client.disconnect()
@@ -395,17 +427,13 @@ async def submit_otp():
     try:
         if not client.is_connected():
             await client.connect()
-
         await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
         session_str = client.session.save()
         await client.disconnect()
         user_sessions.pop(phone, None)
-
         return jsonify({"status": "ok", "session": session_str})
-
     except SessionPasswordNeededError:
         return jsonify({"status": "2fa_needed"})
-
     except Exception:
         return jsonify({"status": "error", "message": "Invalid OTP. Try again."})
 
@@ -420,18 +448,14 @@ async def submit_password():
         return jsonify({"status": "error", "message": "Session context missing. Reload page."})
 
     client = user_sessions[phone]["client"]
-
     try:
         if not client.is_connected():
             await client.connect()
-
         await client.sign_in(password=password)
         session_str = client.session.save()
         await client.disconnect()
         user_sessions.pop(phone, None)
-
         return jsonify({"status": "ok", "session": session_str})
-
     except Exception:
         return jsonify({"status": "error", "message": "Wrong password. Try again."})
 
