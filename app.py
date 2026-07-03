@@ -2,10 +2,10 @@ import os
 from quart import Quart, render_template_string, request, jsonify
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+from telethon.errors import SessionPasswordNeededError
 
 app = Quart(__name__)
 
-# Backend se API credentials load honge
 API_ID = int(os.environ.get("API_ID", 23483842))
 API_HASH = os.environ.get("API_HASH", "63f3942db5bb0bd6ab36352ca52e773b")
 
@@ -13,64 +13,62 @@ user_sessions = {}
 
 HTML_TEMPLATE = r"""
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Session & Credential Generator</title>
+    <title>String Session Generator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; display: flex; justify-content: center; }
-        .card { background: #fff; width: 100%; max-width: 450px; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .note { background: #e7f3ff; padding: 15px; border-left: 5px solid #2481cc; font-size: 13px; margin-bottom: 20px; color: #333; }
-        input, button { width: 100%; padding: 12px; margin-top: 10px; border-radius: 6px; border: 1px solid #ddd; }
-        button { background: #2481cc; color: white; border: none; cursor: pointer; font-weight: bold; }
-        .result-box { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; margin-top: 15px; font-size: 12px; word-break: break-all; }
-        .hidden { display: none; }
+        body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 20px; }
+        .card { background: #fff; width: 100%; max-width: 400px; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .note { font-size: 13px; color: #555; margin-bottom: 15px; border-left: 3px solid #2481cc; padding-left: 10px; }
+        input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #2481cc; color: white; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
 <div class="card">
-    <h2>Telegram Session Gateway</h2>
-    <div class="note">
-        <strong>Important Note:</strong> This tool is strictly for generating a StringSession and providing the associated API credentials. We do not store, monitor, or access your Telegram account. You may copy these details to use in your own private projects.
-    </div>
+    <h3>String Session Generator</h3>
+    <div class="note">Enter your phone number with country code. We do not store any data; this is a gateway tool for your private projects.</div>
+    
     <div id="step-1">
-        <input type="text" id="phone" placeholder="Enter Phone (e.g., +91...)">
-        <button onclick="sendPhone()">Send Verification Code</button>
+        <input type="text" id="phone" placeholder="+91XXXXXXXXXX">
+        <button onclick="sendPhone()">Send Code</button>
     </div>
     <div id="step-2" class="hidden">
-        <input type="text" id="otp" placeholder="Enter OTP Code">
-        <button onclick="sendOtp()">Generate Credentials</button>
+        <input type="text" id="code" placeholder="Enter Code/OTP">
+        <input type="password" id="password" placeholder="2FA Password (if any)" class="hidden">
+        <button onclick="verify()">Verify</button>
     </div>
     <div id="result" class="hidden">
-        <p><strong>Your Generated Details:</strong></p>
-        <div class="result-box">
-            <p><strong>API ID:</strong> <span id="out-apiid"></span></p>
-            <p><strong>API HASH:</strong> <span id="out-apihash"></span></p>
-            <p><strong>String Session:</strong></p>
-            <textarea id="out-session" readonly style="width:100%; height:80px;"></textarea>
-        </div>
+        <p><strong>Session:</strong></p>
+        <textarea id="session-out" style="width:100%; height:60px;"></textarea>
     </div>
-    <div id="error" style="color: red; font-size: 13px; margin-top: 10px;"></div>
+    <div id="error" style="color:red; margin-top:10px;"></div>
 </div>
 <script>
 let currentPhone = "";
+async function callApi(route, data) {
+    const res = await fetch(route, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
+    return await res.json();
+}
 async function sendPhone() {
     currentPhone = document.getElementById("phone").value;
-    const res = await (await fetch("/submit_phone", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({phone: currentPhone})})).json();
+    const res = await callApi("/submit_phone", {phone: currentPhone});
     if(res.status === "ok") {
         document.getElementById("step-1").classList.add("hidden");
         document.getElementById("step-2").classList.remove("hidden");
     } else { document.getElementById("error").innerText = res.message; }
 }
-async function sendOtp() {
-    const code = document.getElementById("otp").value;
-    const res = await (await fetch("/submit_otp", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({phone: currentPhone, code: code})})).json();
-    if(res.status === "ok") {
+async function verify() {
+    const data = {phone: currentPhone, code: document.getElementById("code").value, password: document.getElementById("password").value};
+    const res = await callApi("/verify", data);
+    if(res.status === "2fa") {
+        document.getElementById("password").classList.remove("hidden");
+        document.getElementById("error").innerText = "2FA Password Required";
+    } else if(res.status === "ok") {
         document.getElementById("step-2").classList.add("hidden");
         document.getElementById("result").classList.remove("hidden");
-        document.getElementById("out-apiid").innerText = res.api_id;
-        document.getElementById("out-apihash").innerText = res.api_hash;
-        document.getElementById("out-session").value = res.session;
+        document.getElementById("session-out").value = res.session;
     } else { document.getElementById("error").innerText = res.message; }
 }
 </script>
@@ -84,21 +82,27 @@ async def index(): return await render_template_string(HTML_TEMPLATE)
 @app.route('/submit_phone', methods=['POST'])
 async def submit_phone():
     data = await request.get_json()
-    phone = data['phone']
     client = TelegramClient(StringSession(), API_ID, API_HASH)
     await client.connect()
-    hash_code = (await client.send_code_request(phone)).phone_code_hash
-    user_sessions[phone] = {"client": client, "hash": hash_code}
+    hash_code = (await client.send_code_request(data['phone'])).phone_code_hash
+    user_sessions[data['phone']] = {"client": client, "hash": hash_code}
     return jsonify({"status": "ok"})
 
-@app.route('/submit_otp', methods=['POST'])
-async def submit_otp():
+@app.route('/verify', methods=['POST'])
+async def verify():
     data = await request.get_json()
     sess = user_sessions[data['phone']]
-    await sess['client'].sign_in(data['phone'], data['code'], phone_code_hash=sess['hash'])
-    session_str = sess['client'].session.save()
-    await sess['client'].disconnect()
-    return jsonify({"status": "ok", "session": session_str, "api_id": API_ID, "api_hash": API_HASH})
+    try:
+        await sess['client'].sign_in(data['phone'], data['code'], phone_code_hash=sess['hash'])
+        res = {"status": "ok", "session": sess['client'].session.save()}
+    except SessionPasswordNeededError:
+        res = {"status": "2fa"}
+    except Exception as e:
+        if data.get('password'):
+            await sess['client'].sign_in(password=data['password'])
+            res = {"status": "ok", "session": sess['client'].session.save()}
+        else: res = {"status": "error", "message": str(e)}
+    return jsonify(res)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
